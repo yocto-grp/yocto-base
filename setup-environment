@@ -66,19 +66,19 @@ fi
 OEROOT=$CWD/sources/poky
 
 # Ensure all files in sources/base are kept in sync with project root
-#updated=
-#file="setup-environment"
-#f=$CWD/sources/base/$file
-#if ! cmp -s "$file" "$f"; then
-    #updated="true"
-    #[ -e $file ] && chmod u+w $file
-    #cp $f $file
-#fi
+updated=
+file="setup-environment"
+f=$CWD/sources/base/$file
+if ! cmp -s "$file" "$f"; then
+	updated="true"
+	[ -e $file ] && chmod u+w $file
+	cp $f $file
+fi
 
-#if [ "$updated" = "true" ]; then
-    #echo "The project root content has been updated. Please run '$PROGNAME' again."
-    #return
-#fi
+if [ "$updated" = "true" ]; then
+	echo "The project root content has been updated. Please run '$PROGNAME' again."
+	return
+fi
 
 cd $OEROOT
 
@@ -133,4 +133,5 @@ else
     echo "Your configuration files at $1 have not been touched."
 fi
 
+bitbake $2
 clean_up
