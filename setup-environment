@@ -1,0 +1,136 @@
+#!/bin/sh
+
+# $1 is build dir, such as "build/poky-genericx86-64"
+NCPU=`grep -c processor /proc/cpuinfo`
+CWD=`pwd`
+PROGNAME="setup-environment"
+BUILD_DIR=$(readlink -f $1)
+
+usage()
+{
+    echo -e "\nUsage: source $PROGNAME <build-dir> <SOC>
+    <build-dir>: specifies the build directory location (required)
+
+If undefined, this script will set \$MACHINE to 'imx6dlwisehmi'(imx6) or 'a20navi'(sunxi).
+"
+}
+
+clean_up()
+{
+   unset EULA LIST_MACHINES VALID_MACHINE
+   unset NCPU CWD TEMPLATES SHORTOPTS LONGOPTS ARGS PROGNAME
+   unset generated_config updated
+   unset MACHINE SDKMACHINE DISTRO OEROOT
+}
+
+# get command line options
+SHORTOPTS="h"
+LONGOPTS="help"
+
+ARGS=$(getopt --options $SHORTOPTS  \
+  --longoptions $LONGOPTS --name $PROGNAME -- "$@" )
+# Print the usage menu if invalid options are specified
+if [ $? != 0 -o $# -lt 1 ]; then
+   usage && clean_up
+   return 1
+fi
+
+eval set -- "$ARGS"
+while true;
+do
+    case $1 in
+        -h|--help)
+           usage
+           clean_up
+           return 0
+           ;;
+        --)
+           shift
+           break
+           ;;
+    esac
+done
+
+if [ "$(whoami)" = "root" ]; then
+    echo "ERROR: do not use the BSP as root. Exiting..."
+fi
+
+if [ -z "$SDKMACHINE" ]; then
+    SDKMACHINE='i686'
+fi
+
+if [ -z "$DISTRO" ]; then
+    DISTRO='linda'
+fi
+
+OEROOT=$CWD/sources/poky
+
+# Ensure all files in sources/base are kept in sync with project root
+#updated=
+#file="setup-environment"
+#f=$CWD/sources/base/$file
+#if ! cmp -s "$file" "$f"; then
+    #updated="true"
+    #[ -e $file ] && chmod u+w $file
+    #cp $f $file
+#fi
+
+#if [ "$updated" = "true" ]; then
+    #echo "The project root content has been updated. Please run '$PROGNAME' again."
+    #return
+#fi
+
+cd $OEROOT
+
+mkdir -p $BUILD_DIR
+
+. ./oe-init-build-env $BUILD_DIR > /dev/null
+
+# if conf/local.conf not generated, no need to go further
+if [ ! -e conf/local.conf ]; then
+    clean_up && return 1
+fi
+
+# Clean up PATH, because if it includes tokens to current directories somehow,
+# wrong binaries can be used instead of the expected ones during task execution
+export PATH="`echo $PATH | sed 's/\(:.\|:\)*:/:/g;s/^.\?://;s/:.\?$//'`"
+
+generated_config=
+if [ ! -e conf/local.conf.sample ]; then
+    mv conf/local.conf conf/local.conf.sample
+
+    # Generate bblayers.conf & local.conf 
+    cp $CWD/sources/base/conf/bblayers.conf.$DISTRO-$MACHINE conf/bblayers.conf
+    cp $CWD/sources/base/locals/local.conf.$DISTRO-$MACHINE conf/local.conf
+
+    sed -e "s,BSPDIR :=.*,BSPDIR := \"$CWD\",g" -i conf/bblayers.conf
+
+    # Change settings according environment
+    sed -e "s,MACHINE ??=.*,MACHINE ??= '$MACHINE',g" \
+        -e "s,SDKMACHINE ??=.*,SDKMACHINE ??= '$SDKMACHINE',g" \
+        -e "s,DISTRO ?=.*,DISTRO ?= '$DISTRO',g" \
+        -i conf/local.conf
+
+    for s in $HOME/.oe $HOME/.yocto; do
+        if [ -e $s/site.conf ]; then
+            echo "Linking $s/site.conf to conf/site.conf"
+            ln -s $s/site.conf conf
+        fi
+    done
+
+    generated_config=1
+fi
+
+if [ -n "$generated_config" ]; then
+    cat <<EOF
+Your build environment has been configured with:
+
+    MACHINE=$MACHINE
+    SDKMACHINE=$SDKMACHINE
+    DISTRO=$DISTRO
+EOF
+else
+    echo "Your configuration files at $1 have not been touched."
+fi
+
+clean_up

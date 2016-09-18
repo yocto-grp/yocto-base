@@ -1,0 +1,29 @@
+MACHINE ??= 'imx6qsabrelite'
+DISTRO ?= 'poky'
+PACKAGE_CLASSES ?= "package_ipk"
+EXTRA_IMAGE_FEATURES = "debug-tweaks ssh-server-openssh"
+USER_CLASSES ?= "buildstats image-mklibs image-prelink"
+PATCHRESOLVE = "noop"
+BB_DISKMON_DIRS = "\
+    STOPTASKS,${TMPDIR},1G,100K \
+    STOPTASKS,${DL_DIR},1G,100K \
+    STOPTASKS,${SSTATE_DIR},1G,100K \
+    ABORT,${TMPDIR},100M,1K \
+    ABORT,${DL_DIR},100M,1K \
+    ABORT,${SSTATE_DIR},100M,1K"
+
+CONF_VERSION = "1"
+ACCEPT_FSL_EULA = "1"
+
+PARALLEL_MAKE ?= "-j ${@oe.utils.cpu_count()}"
+BB_NUMBER_THREADS ?= "${@oe.utils.cpu_count()}"
+
+RM_OLD_IMAGE = "1"
+SDKMACHINE ?= "x86_64"
+
+BSPDIR := "${@os.path.abspath(os.path.dirname(d.getVar('FILE', True)) + '/../../..')}"
+DL_DIR ?= "${BSPDIR}/share/downloads"
+SSTATE_DIR ?= "${BSPDIR}/share/sstate-cache"
+
+DISTRO_FEATURES_remove = "3g bluetooth irda nfc pci wifi usbgadget usbhost pcmcia"
+DISTRO_FEATURES_remove += "nfs alsa zeroconf pulseaudio directfb x11 wayland"
